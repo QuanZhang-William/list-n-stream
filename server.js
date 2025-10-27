@@ -6,47 +6,66 @@ var pathHelpers = require('path');
 var beeline = require('beeline');
 var packageJson = require('./package');
 var program = require('commander');
+var querystring = require('querystring');
 
 
 program
-  .version(packageJson.version)
-  .option('-p, --port [port]', 'Run on a custom port')
-  .parse(process.argv);
+    .version(packageJson.version)
+    .option('-p, --port [port]', 'Run on a custom port')
+    .parse(process.argv);
 
-function serverError(response, error){
+function serverError(response, error) {
     console.log(error);
     response.statusCode = 500;
     response.end();
 }
 
-function serveDir(request, response, path){
-    fs.readdir(path, function(error, files){
-        if(error){
+function serveDir(request, response, path) {
+    fs.readdir(path, function (error, files) {
+        if (error) {
             serverError(response, error);
             return;
         }
-        
-        response.writeHead(200, {"Content-Type": "text/html"});
+
+        response.writeHead(200, { "Content-Type": "text/html" });
         response.end(
             '<a href="../">../</a><br>' +
-            files.map(function(fileName){
-            return '<a href="' + fileName + '">' + fileName + '</a>';
-        }).join('<br>'));
+            files.map(function (fileName) {
+                return '<a href="' + fileName + '/?view">' + fileName + '</a>';
+            }).join('<br>'));
     });
 }
 
+var mimeTypes = {
+    'avi': 'video/x-msvideo',
+    'mpg': 'video/mpeg',
+    'mpeg': 'video/mpeg',
+    'mp4': 'video/mpeg'
+}
+
 var router = beeline.route({
-    '/`path...`': function(request, response, details){
-        var path = __dirname + '/' + details.path;
-        fs.stat(path, function(error, info){
-            if(info.isDirectory()){
+    '/`path...`': function (request, response, details) {
+        var path = process.cwd() + '/' + details.path;
+        fs.stat(path, function (error, info) {
+            if (error) {
+                serverError(response, error);
+                return;
+            }
+
+            if (info.isDirectory()) {
                 serveDir(request, response, path);
-            }else{
+            } else {
+                var urlBits = request.url.split('?');
+                if ('view' in querystring.parse(urlBits[1])) {
+                    response.end('<video src="' + urlBits[0] + '" autoplay></video>')
+                    return;
+                }
+                response.writeHead(200, { "Content-Type": mimeTypes[path.split('.').pop()] || 'text/plain' });
                 fs.createReadStream(path)
-                .pipe(response);
+                    .pipe(response);
             }
         });
-    }    
+    }
 });
 
 var server = http.createServer(router);
