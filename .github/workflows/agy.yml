@@ -1,0 +1,18 @@
+name: agy
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+jobs:
+  security:
+    name: agy/security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fake AGY security review
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ "$TITLE" == *BLOCK* ]]; then
+            echo "::error title=AGY security review::1 HIGH finding (simulated). Remove BLOCK from the PR title to pass."
+            exit 1
+          fi
+          echo "No HIGH/CRITICAL findings (simulated)."
